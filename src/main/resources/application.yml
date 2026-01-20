@@ -13,4 +13,5 @@ management:
   metrics:
     tags:
       application: demo-api
-
+      service: demo-monitoring-service # 서비스 라벨 분리 / 배포 단위
+      team: demo-backend # 알람 수신 주체

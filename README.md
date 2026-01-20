@@ -1,4 +1,4 @@
-# Demo Monitoring Application
+                                                                                                                # Demo Monitoring Application
 Spring Boot 모니터링 예제입니다.
 
 어느 프로젝트에서든 실무 적용 가능하도록 지향합니다.
@@ -12,20 +12,32 @@ Spring Boot 모니터링 예제입니다.
 `/monitoring` 디렉토리에서 `docker-compose up -d` 
 
 3. 접속 및 모니터링 설정
-
-- Prometheus
+- Prometheus\
 http://localhost:9090 -> Status -> Target Health -> State `UP` 확인
 
-- Grafana 대시보드 설정 
-http://localhost:3000
-admin/admin
+- Grafana 대시보드 설정\
+http://localhost:3000\
+ID/PW: admin/admin\
 Dashboards -> import dashboard -> ID: 20727 입력 -> Load
 
-- Alertmanager
+- Alertmanager\
   http://localhost:9093
 
 알람 테스트 시나리오
 1. Spring Boot 중지
 2. /error-test API 호출
 
-
+## 전체 아키텍쳐
+```
+Spring Boot (Micrometer)
+├─ HTTP / JVM / Custom Metrics
+└─ /actuator/prometheus
+↓
+Prometheus
+├─ scrape
+├─ alert rules (시나리오 기반)
+↓
+Alertmanager
+├─ service / severity / slo routing
+└─ Slack / On-call
+```

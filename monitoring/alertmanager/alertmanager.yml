@@ -1,22 +1,190 @@
 global:
   resolve_timeout: 5m
 
+################################################################################
+# ROUTING
+################################################################################
 route:
-  receiver: "slack-notifications"
-  group_by: ["alertname"]
+  receiver: "default-slack"
+
+  # 알람 그룹 기준 (중요: 노이즈 감소)
+  group_by: ["alertname", "service"]
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 4h
 
+  routes:
+    ###########################################################################
+    # 1️⃣ 배포 / 점검 중 알람 억제용 (Silence와 병행)
+    ###########################################################################
+    - matchers:
+        - maintenance="true"
+      receiver: "null-receiver"
+
+    ###########################################################################
+    # 2️⃣ SLO / Error Budget 알람
+    ###########################################################################
+    - matchers:
+        - slo="availability"
+        - severity="critical"
+      receiver: "slo-critical"
+
+    - matchers:
+        - slo="availability"
+        - severity="warning"
+      receiver: "slo-warning"
+
+    ###########################################################################
+    # 3️⃣ 서비스별 라우팅
+    ###########################################################################
+    - matchers:
+        - service="payment-service"
+      receiver: "payment-team-slack"
+
+    - matchers:
+        - service="demo-monitoring-service"
+        - severity="critical"
+      receiver: "backend-critical"
+
+    - matchers:
+        - service="demo-monitoring-service"
+        - severity="warning"
+      receiver: "backend-warning"
+
+################################################################################
+# RECEIVERS
+################################################################################
 receivers:
-  - name: "slack-notifications"
+  ###########################################################################
+  # 기본 (fallback)
+  ###########################################################################
+  - name: "default-slack"
     slack_configs:
-      - api_url: "https://hooks.slack.com/services/T000/B000/XXXX"
-        channel: "#alerts"
-        title: "{{ .CommonAnnotations.summary }}"
+      - api_url: "https://hooks.slack.com/services/XXX"
+        channel: "#alerts-common"
+        title: "[{{ .CommonLabels.service }}] {{ .CommonAnnotations.summary }}"
         text: >-
           {{ range .Alerts }}
-          *Alert:* {{ .Annotations.description }}
+          *Service:* {{ .Labels.service }}
           *Severity:* {{ .Labels.severity }}
-          *StartsAt:* {{ .StartsAt }}
+          *Description:* {{ .Annotations.description }}
           {{ end }}
+
+  ###########################################################################
+  # Backend - Critical
+  ###########################################################################
+  - name: "backend-critical"
+    slack_configs:
+      - api_url: "https://hooks.slack.com/services/XXX"
+        channel: "#alerts-backend-critical"
+        title: ":rotating_light: [CRITICAL][{{ .CommonLabels.service }}] {{ .CommonAnnotations.summary }}"
+        text: >-
+          *🚨 장애 발생*
+
+          *서비스:* {{ .CommonLabels.service }}
+          *심각도:* {{ .CommonLabels.severity }}
+          *영향:* {{ .CommonAnnotations.description }}
+          *발생 시각:* {{ .StartsAt }}
+
+          *즉시 조치*
+          1. Grafana Runbook 대시보드 확인
+          2. 최근 배포 여부 확인
+          3. 롤백 또는 재기동 판단
+
+          *🔗 바로가기*
+          • Grafana: https://grafana.company.com/d/runbook-demo
+          • Runbook: https://wiki.company.com/runbooks/{{ .CommonLabels.alertname }}
+
+          *On-call:* @backend-oncall
+
+  ###########################################################################
+  # Backend - Warning
+  ###########################################################################
+  - name: "backend-warning"
+    slack_configs:
+      - api_url: "https://hooks.slack.com/services/XXX"
+        channel: "#alerts-backend-warning"
+        title: ":warning: [WARNING][{{ .CommonLabels.service }}] {{ .CommonAnnotations.summary }}"
+        text: >-
+          *⚠️ 이상 징후 감지*
+
+          *서비스:* {{ .CommonLabels.service }}
+          *지표:* {{ .CommonAnnotations.description }}
+          *심각도:* {{ .CommonLabels.severity }}
+
+          *권장 행동*
+          • Grafana 지표 추이 확인
+          • 추가 악화 여부 모니터링
+
+          *🔗 Grafana*
+          https://grafana.company.com/d/runbook-demo
+
+  ###########################################################################
+  # Payment Team
+  ###########################################################################
+  - name: "payment-team-slack"
+    slack_configs:
+      - api_url: "https://hooks.slack.com/services/XXX"
+        channel: "#alerts-payment"
+        title: ":rotating_light: [{{ .CommonLabels.service }}] {{ .CommonAnnotations.summary }}"
+        text: >-
+          *💳 결제 서비스 알람*
+
+          *Severity:* {{ .CommonLabels.severity }}
+          *Description:* {{ .CommonAnnotations.description }}
+
+          *🔗 Grafana*
+          https://grafana.company.com/d/payment-service
+
+  ###########################################################################
+  # SLO - Critical
+  ###########################################################################
+  - name: "slo-critical"
+    slack_configs:
+      - api_url: "https://hooks.slack.com/services/XXX"
+        channel: "#alerts-slo"
+        title: ":chart_with_downwards_trend: [SLO CRITICAL][{{ .CommonLabels.service }}]"
+        text: >-
+          *📉 Error Budget 소진 임박*
+
+          *SLO:* {{ .CommonLabels.slo }}
+          *영향:* {{ .CommonAnnotations.description }}
+
+          *조치*
+          • 신규 배포 중단
+          • 안정화 작업 우선
+
+          *🔗 SLO 대시보드*
+          https://grafana.company.com/d/slo-dashboard
+
+  ###########################################################################
+  # SLO - Warning
+  ###########################################################################
+  - name: "slo-warning"
+    slack_configs:
+      - api_url: "https://hooks.slack.com/services/XXX"
+        channel: "#alerts-slo"
+        title: ":warning: [SLO WARNING][{{ .CommonLabels.service }}]"
+        text: >-
+          *📊 SLO 위험 신호*
+
+          *SLO:* {{ .CommonLabels.slo }}
+          *설명:* {{ .CommonAnnotations.description }}
+
+          *🔗 SLO 대시보드*
+          https://grafana.company.com/d/slo-dashboard
+
+  ###########################################################################
+  # Null Receiver (Silence / Maintenance)
+  ###########################################################################
+  - name: "null-receiver"
+
+################################################################################
+# INHIBITIONS (중복 알람 억제)
+################################################################################
+inhibit_rules:
+  - source_matchers:
+      - severity="critical"
+    target_matchers:
+      - severity="warning"
+    equal: ["alertname", "service"]

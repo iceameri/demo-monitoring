@@ -1,0 +1,113 @@
+groups:
+  - name: demo-monitoring-scenarios
+    rules:
+
+      ###########################################################################
+      # 시나리오 ① 서비스 전체 다운
+      ###########################################################################
+      - alert: ServiceAllDown
+        expr: sum(up{service="demo-monitoring-service"}) == 0
+        for: 30s
+        labels:
+          severity: critical
+          service: demo-monitoring-service
+          team: backend
+        annotations:
+          summary: "서비스 전체 다운"
+          description: "모든 인스턴스가 응답하지 않음"
+          runbook: "https://wiki.company.com/runbooks/service-all-down"
+          grafana: "https://grafana.company.com/d/runbook-demo"
+
+      ###########################################################################
+      # 시나리오 ② 부분 장애 (5xx 증가)
+      ###########################################################################
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(http_server_requests_seconds_count{
+            service="demo-monitoring-service",
+            status=~"5.."
+          }[5m]))
+          /
+          sum(rate(http_server_requests_seconds_count{
+            service="demo-monitoring-service"
+          }[5m]))
+          > 0.05
+        for: 2m
+        labels:
+          severity: warning
+          service: demo-monitoring-service
+          team: backend
+        annotations:
+          summary: "5xx 에러율 증가"
+          description: "전체 요청 대비 5xx 에러 비율이 5%를 초과"
+          runbook: "https://wiki.company.com/runbooks/high-error-rate"
+          grafana: "https://grafana.company.com/d/runbook-demo"
+
+      ###########################################################################
+      # 시나리오 ③ 응답 지연 (Latency)
+      ###########################################################################
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(http_server_requests_seconds_bucket{
+              service="demo-monitoring-service"
+            }[5m])) by (le)
+          ) > 1
+        for: 3m
+        labels:
+          severity: warning
+          service: demo-monitoring-service
+          team: backend
+        annotations:
+          summary: "응답 지연 증가"
+          description: "HTTP P95 응답시간이 1초를 초과"
+          runbook: "https://wiki.company.com/runbooks/high-latency"
+          grafana: "https://grafana.company.com/d/runbook-demo"
+
+      ###########################################################################
+      # 시나리오 ④ 외부 의존성 장애
+      ###########################################################################
+      - alert: ExternalDependencyFailure
+        expr: |
+          sum(rate(http_client_requests_seconds_count{
+            service="demo-monitoring-service",
+            status=~"5.."
+          }[2m])) > 5
+        for: 1m
+        labels:
+          severity: critical
+          service: demo-monitoring-service
+          team: backend
+          dependency: external-api
+        annotations:
+          summary: "외부 시스템 장애"
+          description: "외부 API 호출에서 5xx 오류가 급증"
+          runbook: "https://wiki.company.com/runbooks/external-dependency"
+          grafana: "https://grafana.company.com/d/runbook-demo"
+
+      ###########################################################################
+      # 시나리오 ⑤ 리소스 고갈 (Heap)
+      ###########################################################################
+      - alert: HeapAlmostFull
+        expr: |
+          jvm_memory_used_bytes{
+            service="demo-monitoring-service",
+            area="heap"
+          }
+          /
+          jvm_memory_max_bytes{
+            service="demo-monitoring-service",
+            area="heap"
+          }
+          > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          service: demo-monitoring-service
+          team: backend
+        annotations:
+          summary: "Heap 사용량 임계"
+          description: "Heap 메모리 사용률이 85%를 초과"
+          runbook: "https://wiki.company.com/runbooks/heap-almost-full"
+          grafana: "https://grafana.company.com/d/runbook-demo"

@@ -1,18 +1,46 @@
 global:
-  scrape_interval: 5s
+  scrape_interval: 5s        # 지표 수집 주기
+  evaluation_interval: 5s    # Alert rule 평가 주기
 
+################################################################################
+# Alertmanager 연동
+################################################################################
 alerting:
   alertmanagers:
     - static_configs:
         - targets:
             - "alertmanager:9093"
 
+################################################################################
+# Alert Rules
+################################################################################
 rule_files:
-  - "/etc/prometheus/alert-rules.yml"
+  - "/etc/prometheus/alert-rules/*.yml"
 
+################################################################################
+# Scrape Targets
+################################################################################
 scrape_configs:
-  - job_name: "spring-boot"
-    metrics_path: "/actuator/prometheus"
+
+  ###########################################################################
+  # Prometheus 자기 자신
+  ###########################################################################
+  - job_name: "prometheus"
     static_configs:
       - targets:
-          - "host.docker.internal:8080"
+          - "localhost:9090"
+
+  ###########################################################################
+  # Spring Boot Application (Local IntelliJ 실행)
+  ###########################################################################
+  - job_name: "spring-boot"
+    metrics_path: "/actuator/prometheus"
+    scrape_interval: 5s
+
+    static_configs:
+      - targets:
+          - "localhost:8080"
+        labels:
+          service: demo-monitoring-service
+          team: backend
+          environment: local
