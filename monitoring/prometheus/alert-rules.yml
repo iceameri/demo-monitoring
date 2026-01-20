@@ -1,0 +1,41 @@
+groups:
+  - name: spring-boot-alerts
+    rules:
+
+      # 서버 다운
+      - alert: SpringBootDown
+        expr: up{job="spring-boot"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Spring Boot 서버 다운"
+          description: "Spring Boot 애플리케이션이 응답하지 않습니다."
+
+      # 에러 비율 증가
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(http_server_requests_seconds_count{status=~"5.."}[1m]))
+          /
+          sum(rate(http_server_requests_seconds_count[1m]))
+          > 0.1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HTTP 5xx 비율 증가"
+          description: "최근 1분간 5xx 비율이 10% 초과"
+
+      # 응답 지연
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(http_server_requests_seconds_bucket[1m])) by (le)
+          ) > 1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "응답 지연 증가"
+          description: "95퍼센타일 응답 시간이 1초 초과"

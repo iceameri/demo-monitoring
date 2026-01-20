@@ -25,3 +25,19 @@ Prometheus 와 Grafana 는 Docker-compose 구성
 |알람|Alertmanager 추가|
 |보안|actuator IP 제한|
 |K8s|ServiceMonitor 사용|
+
+Alertmanager 전체 구조
+```
+Spring Boot
+└─ /actuator/prometheus
+↑
+│ scrape
+│
+Prometheus
+└─ alert rules
+↓
+Alertmanager
+└─ Slack / Email / Webhook
+```
+✔️ Prometheus는 판단만
+✔️ Alertmanager가 알림 책임

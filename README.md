@@ -21,4 +21,11 @@ http://localhost:3000
 admin/admin
 Dashboards -> import dashboard -> ID: 20727 입력 -> Load
 
+- Alertmanager
+  http://localhost:9093
+
+알람 테스트 시나리오
+1. Spring Boot 중지
+2. /error-test API 호출
+
 
