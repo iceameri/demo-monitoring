@@ -25,3 +25,25 @@ Prometheus 와 Grafana 는 Docker-compose 구성
 |알람|Alertmanager 추가|
 |보안|actuator IP 제한|
 |K8s|ServiceMonitor 사용|
+
+네트워크 장애 판단 로직
+
+| 패턴                   | 판단      |
+| -------------------- | ------- |
+| Up=0                 | 앱 다운    |
+| Up=1, RPS≈0, Error=0 | 🔥 네트워크 |
+| Up=1, RPS↓, Error↑   | 앱/의존성   |
+| 특정 URI만 0            | 상위 서비스  |
+| Healthcheck만 0       | LB 문제   |
+
+*RPS = Request Per Second
+
+Grafana 대시보드에 추가할 패널
+
+| 패널                  | 이유           |
+| ------------------- | ------------ |
+| RPS                 | 트래픽 단절 확인    |
+| Error Rate          | 네트워크 vs 앱 구분 |
+| Up                  | 프로세스 상태      |
+| Health Endpoint RPS | LB 이슈        |
+| External API RPS    | 외부 네트워크      |

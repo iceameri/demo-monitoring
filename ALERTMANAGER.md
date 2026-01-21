@@ -122,6 +122,7 @@ Silence 제거
 | 3 | 응답 지연          | 체감 장애 |
 | 4 | 외부 의존성 장애      | 연쇄 장애 |
 | 5 | 리소스 고갈         | 곧 장애  |
+-- 네트워크장애
 
 ## 시나리오 1: 서비스 전체 다운
 - 배포 실패
@@ -266,6 +267,15 @@ annotations:
   runbook: "https://wiki.company.com/runbooks/demo-monitoring-down"
 
 ```
+
+## 시나리오 6: 네트워크 장애
+- 네트워크 단절
+- 방화벽 / 보안그룹 문제
+- DNS 이슈
+- LB ↔ 앱 간 통신 실패
+- Pod ↔ 외부 API 통신 불가
+
+구분
 
 
 ## 배포 시 Alertmanager Silence 자동화

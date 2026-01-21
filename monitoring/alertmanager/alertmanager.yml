@@ -7,7 +7,6 @@ global:
 route:
   receiver: "default-slack"
 
-  # 알람 그룹 기준 (중요: 노이즈 감소)
   group_by: ["alertname", "service"]
   group_wait: 30s
   group_interval: 5m
@@ -15,14 +14,25 @@ route:
 
   routes:
     ###########################################################################
-    # 1️⃣ 배포 / 점검 중 알람 억제용 (Silence와 병행)
+    # 1️⃣ Maintenance / 배포 중 알람 억제
     ###########################################################################
     - matchers:
         - maintenance="true"
       receiver: "null-receiver"
 
     ###########################################################################
-    # 2️⃣ SLO / Error Budget 알람
+    # 2️⃣ 장애 카테고리 기반 (가장 중요)
+    ###########################################################################
+    - matchers:
+        - category="network"
+      receiver: "backend-critical"
+
+    - matchers:
+        - category="upstream"
+      receiver: "backend-warning"
+
+    ###########################################################################
+    # 3️⃣ SLO / Error Budget
     ###########################################################################
     - matchers:
         - slo="availability"
@@ -35,12 +45,8 @@ route:
       receiver: "slo-warning"
 
     ###########################################################################
-    # 3️⃣ 서비스별 라우팅
+    # 4️⃣ 서비스 + 심각도
     ###########################################################################
-    - matchers:
-        - service="payment-service"
-      receiver: "payment-team-slack"
-
     - matchers:
         - service="demo-monitoring-service"
         - severity="critical"
@@ -50,6 +56,13 @@ route:
         - service="demo-monitoring-service"
         - severity="warning"
       receiver: "backend-warning"
+
+    ###########################################################################
+    # 5️⃣ 서비스 전담 팀
+    ###########################################################################
+    - matchers:
+        - service="payment-service"
+      receiver: "payment-team-slack"
 
 ################################################################################
 # RECEIVERS

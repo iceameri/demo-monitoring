@@ -3,7 +3,7 @@ groups:
     rules:
 
       ###########################################################################
-      # 시나리오 ① 서비스 전체 다운
+      # 시나리오 1 서비스 전체 다운
       ###########################################################################
       - alert: ServiceAllDown
         expr: sum(up{service="demo-monitoring-service"}) == 0
@@ -19,7 +19,7 @@ groups:
           grafana: "https://grafana.company.com/d/runbook-demo"
 
       ###########################################################################
-      # 시나리오 ② 부분 장애 (5xx 증가)
+      # 시나리오 2 부분 장애 (5xx 증가)
       ###########################################################################
       - alert: HighErrorRate
         expr: |
@@ -44,7 +44,7 @@ groups:
           grafana: "https://grafana.company.com/d/runbook-demo"
 
       ###########################################################################
-      # 시나리오 ③ 응답 지연 (Latency)
+      # 시나리오 3 응답 지연 (Latency)
       ###########################################################################
       - alert: HighLatency
         expr: |
@@ -66,7 +66,7 @@ groups:
           grafana: "https://grafana.company.com/d/runbook-demo"
 
       ###########################################################################
-      # 시나리오 ④ 외부 의존성 장애
+      # 시나리오 4 외부 의존성 장애
       ###########################################################################
       - alert: ExternalDependencyFailure
         expr: |
@@ -87,7 +87,7 @@ groups:
           grafana: "https://grafana.company.com/d/runbook-demo"
 
       ###########################################################################
-      # 시나리오 ⑤ 리소스 고갈 (Heap)
+      # 시나리오 5 리소스 고갈 (Heap)
       ###########################################################################
       - alert: HeapAlmostFull
         expr: |
@@ -111,3 +111,110 @@ groups:
           description: "Heap 메모리 사용률이 85%를 초과"
           runbook: "https://wiki.company.com/runbooks/heap-almost-full"
           grafana: "https://grafana.company.com/d/runbook-demo"
+      ###############################################################################
+      # 시나리오 6 네트워크 장애 (Network Issue)
+      # “Up + RPS + Error 타입” 조합
+      ###############################################################################
+
+      ###############################################################################
+      # 시나리오 6.1 정상트래픽 감소 (알람 X)
+      # 최근 1시간 평균 대비 70% 이상 감소.
+      ###############################################################################
+      - alert: TrafficDropExpected
+        expr: |
+          sum(rate(http_server_requests_seconds_count{
+            service="demo-monitoring-service"
+          }[5m]))
+          <
+          (
+            avg_over_time(
+              sum(rate(http_server_requests_seconds_count{
+                service="demo-monitoring-service"
+              }[5m]))
+            [1h]
+          ) * 0.3
+          )
+        for: 10m
+        labels:
+          severity: info
+          service: demo-monitoring-service
+          category: traffic
+        annotations:
+          summary: "트래픽 감소 (예상 범위)"
+          description: "최근 1시간 평균 대비 70% 이상 감소"
+
+      ###############################################################################
+      # 시나리오 6.2 네트워크 장애
+      # 서비스는 살아 있음 and 요청 없음 and 에러 없음. 네트워크 장애 의심
+      ###############################################################################
+      - alert: NetworkIsolationDetected
+        expr: |
+          (
+            sum(up{service="demo-monitoring-service"}) > 0
+          )
+          and
+          (
+            sum(rate(http_server_requests_seconds_count{
+              service="demo-monitoring-service"
+            }[5m])) < 0.05
+          )
+          and
+          (
+            sum(rate(http_server_requests_seconds_count{
+              service="demo-monitoring-service",
+              status=~"4..|5.."
+            }[5m])) == 0
+          )
+        for: 2m
+        labels:
+          severity: critical
+          service: demo-monitoring-service
+          category: network
+        annotations:
+          summary: "네트워크 단절 의심"
+          description: "서비스는 살아 있으나 요청/에러 모두 없음"
+          runbook: "네트워크/LB/DNS 즉시 점검"
+
+      ###############################################################################
+      # 시나리오 6.3 상위 서비스 장애
+      # 상위 서비스 장애 (특정 API)
+      ###############################################################################
+      - alert: UpstreamServiceDown
+        expr: |
+          sum(rate(http_server_requests_seconds_count{
+            service="demo-monitoring-service",
+            uri="/api/payment"
+          }[5m])) == 0
+          and
+          sum(rate(http_server_requests_seconds_count{
+            service="demo-monitoring-service"
+          }[5m])) > 1
+        for: 3m
+        labels:
+          severity: warning
+          service: demo-monitoring-service
+          category: upstream
+        annotations:
+          summary: "상위 서비스 장애 의심"
+          description: "특정 API 호출만 완전히 중단됨"
+
+      ###############################################################################
+      # 시나리오 6.4 LB ↔ App 간 네트워크 장애
+      # LoadBalancer 와 Application 간 네트워크 장애 의심
+      ###############################################################################
+      - alert: LoadBalancerToAppNetworkIssue
+        expr: |
+          sum(rate(http_server_requests_seconds_count{
+            service="demo-monitoring-service",
+            uri="/actuator/health"
+          }[5m])) == 0
+          and
+          sum(up{service="demo-monitoring-service"}) > 0
+        for: 1m
+        labels:
+          severity: critical
+          service: demo-monitoring-service
+          category: network
+        annotations:
+          summary: "LB ↔ App 네트워크 장애"
+          description: "헬스체크 요청이 도달하지 않음"
